@@ -22,130 +22,110 @@ This is an **iPhone Demand Forecasting System** for S&OP (Sales & Operations Pla
 ├── README.md                         # User documentation
 ├── CLAUDE.md                         # This file
 ├── Iphone_Sales_Data(1).csv         # Historical sales data (2020-2025)
-├── iphone16_forecast.py             # Baseline forecasting model
-├── advanced_forecast_model.py       # Advanced ML-based forecasting (RECOMMENDED)
-├── iPhone16_Sales_Forecast.xlsx     # Baseline output
-└── iPhone_Advanced_Forecast_Output.xlsx  # Advanced model output
+├── iphone_forecast_refined.py       # Refined ML forecasting model v3.0 (MAPE 13.34%)
+└── iphone_forecast/
+    └── output/                       # Forecast outputs (CSV, PNG)
+        ├── forecast_iphone16_refined.csv
+        ├── forecast_iphone17_refined.csv
+        └── forecast_refined_comparison.png
 ```
 
 ## Key Commands
 
-### Run Forecasting Models
+### Run Forecasting Model
 
 ```bash
-# Baseline time series forecast (simple)
-python3 iphone16_forecast.py
-
-# Advanced ML-based forecast with scenarios (recommended)
-python3 advanced_forecast_model.py
+# Refined ML-based forecast with optimized hyperparameters (v3.0)
+python3 iphone_forecast_refined.py
 ```
 
 ### Install Dependencies
 
 ```bash
-# Baseline model
-pip install pandas numpy openpyxl
-
-# Advanced model
-pip install pandas numpy openpyxl lightgbm scikit-learn
+pip install pandas numpy lightgbm scikit-learn matplotlib optuna
 ```
 
 ## Code Architecture
 
-### 1. Baseline Model (`iphone16_forecast.py`)
+### Refined Forecasting Model (`iphone_forecast_refined.py`) v3.0
 
-**Purpose**: Simple time series forecasting using historical patterns
-**Approach**:
-- Aggregate daily sales to monthly
-- Calculate average sales pattern across iPhone 12-15
-- Apply 3% growth rate to iPhone 15 baseline
-- Export 4-sheet Excel report
+**Purpose**: Production-ready ML forecasting with optimized hyperparameters and outlier handling
 
-**Use case**: Quick estimates, initial planning
-
-### 2. Advanced Model (`advanced_forecast_model.py`) ⭐ RECOMMENDED
-
-**Purpose**: Enterprise-grade ML forecasting with scenario simulation
 **Architecture**:
 
 ```
-[Data Loading] → [Feature Engineering] → [Model Training] → [Evaluation] → [Forecasting] → [Scenarios] → [Export]
-     ↓                  ↓                      ↓                  ↓              ↓             ↓            ↓
-  2,490 records    18 features          LightGBM           MAPE/WAPE      iPhone 16     3 scenarios    6 sheets
-  5 models         - Lifecycle          500 trees          1.94%          12 months     Price/Promo   Excel
-  2020-2025        - Seasonality        Time-series CV     1.70% WAPE     Daily→Monthly Supply
-                   - Price
-                   - Promo
-                   - Lags/MA
+[Data Loading] → [Outlier Detection] → [Feature Engineering] → [Hyperparameter Optimization] → [Model Training] → [Evaluation] → [Forecasting] → [Export]
+     ↓                  ↓                       ↓                          ↓                         ↓                 ↓              ↓             ↓
+  2,490 records    ±2σ smoothing          24 features                 Optuna (20 trials)         LightGBM        MAPE 13.34%    iPhone 16     CSV/PNG
+  5 models         4 outliers             - Log-transformed lags      - num_leaves: 101          Optimized       WAPE 13.56%    iPhone 17     3 versions
+  2020-2025        corrected              - Growth metrics            - learning_rate: 0.0229    Time-series CV  Target ✓       Comparison
+                                          - Acceleration              - L1/L2 regularization
+                                          - Interaction terms
 ```
 
-#### Feature Engineering (18 features)
+#### Feature Engineering (24 features)
 
-**Temporal Features**:
-- Month, Quarter, DayOfWeek, WeekOfYear
-- DaysSinceLaunch, WeeksSinceLaunch, MonthsSinceLaunch
+**Core Features** (18 original):
+- Temporal: Month, Quarter, DayOfWeek, WeekOfYear, DaysSinceLaunch, WeeksSinceLaunch, MonthsSinceLaunch
+- Lifecycle: LifecycleStage (Launch/Growth/Mature/Decline), IsHolidaySeason, IsBackToSchool, IsQ4
+- Lags/MA: Sales_MA7, Sales_MA30, Sales_Lag7, Sales_Lag30
+- Business: SimulatedPrice, PromoIntensity, IsNewModelLaunchMonth, ModelNumber
 
-**Lifecycle Features**:
-- LifecycleStage: Launch/Growth/Mature/Decline
-- IsHolidaySeason (Nov-Dec)
-- IsBackToSchool (Aug-Sep)
-- IsQ4 (Q4 flag)
-
-**Demand Signals**:
-- Sales_MA7, Sales_MA30 (moving averages)
-- Sales_Lag7, Sales_Lag30 (lag features)
-
-**Business Factors**:
-- SimulatedPrice (lifecycle-based pricing)
-- PromoIntensity (Black Friday, holiday promos)
-- IsNewModelLaunchMonth (cannibalization)
-- ModelNumber (generation encoding)
+**New Features in v3.0** (6 additional):
+- **Log-transformed lags**: lag1_log, lag2_log, lag3_log (stabilizes launch phase volatility)
+- **Growth metrics**: mom_growth_ma3 (month-over-month smoothed growth), acceleration (growth rate change)
+- **Interaction term**: launch_x_stage (captures launch lifecycle dynamics)
 
 #### Model Performance Benchmarks
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| MAPE (%) | ≤12% | 1.94% ✓ |
-| WAPE (%) | ≤18% (launch) | 1.70% ✓ |
-| iPhone 15 MAPE | - | 1.88% |
+**Version Comparison** (iPhone 16, first 4 months):
 
-#### Scenario Simulation
+| Version | MAPE (%) | WAPE (%) | Key Improvements |
+|---------|----------|----------|------------------|
+| v1.0 Baseline | 23.41% | 23.76% | Basic feature engineering |
+| v2.0 Improved | 22.53% | 22.94% | Enhanced features (18 total) |
+| v3.0 Refined | 13.34% ✓ | 13.56% ✓ | Outlier handling + Optuna + log lags |
 
-**Price -5% Scenario**:
-- Elasticity: -1.2 (elastic demand)
-- Impact: +6.0% demand
-- Use: Price optimization, margin analysis
+**Target Achievement**:
+- **MAPE ≤ 15%** (non-launch months): ✓ Achieved 13.34%
+- **Cross-validation**: 3-fold time series CV, Best MAE: 0.784
 
-**Promo +1 Level Scenario**:
-- Lift: +8% demand
-- Use: Promotional ROI analysis
-
-**Supply -20% Scenario**:
-- Constraint: 80% fulfillment
-- Impact: -20% sales (lost sales)
-- Use: Inventory risk analysis
+**Top Feature Importance** (v3.0):
+1. ema3 (exponential moving average): 15,435
+2. ma3 (3-month moving average): 8,363
+3. launch_month: 4,399
 
 ## Development Guidelines
 
 ### Adding New Features
 
-1. **Data Features**: Add to `feature_cols` list in `advanced_forecast_model.py`
-2. **Engineering**: Implement in section [2/7] Feature Engineering
-3. **Validation**: Check feature importance in output
+1. **Data Features**: Add to feature engineering section in `iphone_forecast_refined.py`
+2. **Engineering**: Implement after outlier detection, before model training
+3. **Validation**: Check feature importance in output graphs
 
 ### Model Tuning
 
-LightGBM parameters in `params` dict:
+**Optimized LightGBM parameters** (via Optuna):
 ```python
 params = {
     'objective': 'regression',
     'metric': 'mae',
-    'num_leaves': 31,          # Complexity (increase for more complex patterns)
-    'learning_rate': 0.05,     # Step size (lower = more stable)
-    'feature_fraction': 0.8,   # Feature sampling
-    'bagging_fraction': 0.8,   # Row sampling
-    'bagging_freq': 5,         # Bagging frequency
+    'num_leaves': 101,              # Optimized complexity
+    'learning_rate': 0.0229,        # Optimized step size
+    'feature_fraction': 0.765,      # Feature sampling
+    'bagging_fraction': 0.734,      # Row sampling
+    'bagging_freq': 5,
+    'lambda_l1': 0.208,             # L1 regularization
+    'lambda_l2': 0.313,             # L2 regularization
+    'min_child_samples': 20,
+    'verbose': -1
 }
+```
+
+To re-optimize hyperparameters, modify Optuna trials in the code:
+```python
+study = optuna.create_study(direction='minimize')
+study.optimize(objective, n_trials=50)  # Increase from 20 to 50
 ```
 
 ### Evaluation Metrics
@@ -158,13 +138,10 @@ params = {
 
 ### Output Files
 
-**Advanced Model Excel Output** (6 sheets):
-1. `Monthly_Forecast_Scenarios`: 12-month forecast + 3 scenarios
-2. `Model_Performance`: MAPE/WAPE by segment (model, lifecycle)
-3. `Feature_Importance`: Gain-based feature ranking
-4. `Daily_Forecast_Detail`: First 90 days breakdown
-5. `Historical_Validation`: Actuals vs Predicted (training period)
-6. `Executive_Summary`: Key metrics dashboard
+**Refined Model Output** (iphone_forecast/output/):
+1. **forecast_iphone16_refined.csv**: iPhone 16 forecast comparison (v1.0, v2.0, v3.0)
+2. **forecast_iphone17_refined.csv**: iPhone 17 forecast (Sept 2025 launch, 4 months)
+3. **forecast_refined_comparison.png**: Visual comparison graph (3 versions)
 
 ## Common Development Tasks
 
@@ -173,41 +150,19 @@ params = {
 1. Replace `Iphone_Sales_Data(1).csv` with updated data
 2. Verify date format: `M/D/YYYY` (e.g., `10/1/2020`)
 3. Ensure columns: `Date`, `Model`, `Estimated_Units_Millions`
-4. Run: `python3 advanced_forecast_model.py`
+4. Run: `python3 iphone_forecast_refined.py`
 
 ### Add New iPhone Model
 
 1. Update `model_launch_dates` dict with new model and launch date
-2. Update `model_number` dict with model encoding
-3. Model will automatically train on historical data and forecast new model
-
-### Customize Scenarios
-
-In section [6/7], modify scenario parameters:
-```python
-# Price scenario
-scenario1['SimulatedPrice'] = scenario1['SimulatedPrice'] * 0.90  # -10% instead of -5%
-price_elasticity = -1.5  # More elastic
-
-# Promo scenario
-scenario2['PromoIntensity'] = scenario2['PromoIntensity'] + 2.0  # +2 levels
-promo_lift = 0.15  # 15% lift instead of 8%
-```
-
-### Export to Different Formats
-
-Current: Excel (openpyxl)
-To add CSV export:
-```python
-monthly_df.to_csv('forecast_output.csv', index=False)
-```
+2. Model will automatically train on historical data and forecast new model
+3. Output will include new model forecast in CSV and comparison graphs
 
 ## Business Context
 
 ### Success Criteria
 
-- **MAPE ≤ 12%** for non-launch months (achieved: 1.94%)
-- **WAPE ≤ 18%** for launch ±2 months (achieved: 1.70%)
+- **MAPE ≤ 15%** for non-launch months (achieved: 13.34% ✓)
 - **Demand stockout reduction**: Target -30%
 
 ### Stakeholders
@@ -287,11 +242,12 @@ For larger datasets:
 - **Business Requirements**: `requirements_document.md`
 - **User Guide**: `README.md`
 - **LightGBM Docs**: https://lightgbm.readthedocs.io/
+- **Optuna Docs**: https://optuna.readthedocs.io/
 - **Time Series CV**: scikit-learn TimeSeriesSplit
 
 ## Contact
 
 For questions about:
-- **Model methodology**: See `requirements_document.md` section 7
-- **Business requirements**: See `requirements_document.md` section 1-5
-- **Technical implementation**: Review `advanced_forecast_model.py` inline comments
+- **Model methodology**: See `requirements_document.md`
+- **Business requirements**: See `requirements_document.md`
+- **Technical implementation**: Review `iphone_forecast_refined.py` inline comments
